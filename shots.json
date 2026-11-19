@@ -1,5 +1,1 @@
-[
-  { "name": "1-cover.jpg", "query": "?shot=cover&photo=pier&caption=Sunset%20Heist", "w": 1080, "h": 1080 },
-  { "name": "2-editor.jpg", "query": "?shot=editor&photo=boulevard&caption=Boulevard%20Queen", "w": 1280, "h": 720 },
-  { "name": "3-cover.jpg", "query": "?shot=cover&photo=boulevard&caption=Boulevard%20Queen", "w": 1080, "h": 1080 }
-]
+[{"h":720,"name":"1-cover.jpg","query":"?shot=cover&photo=neon&photo2=boulevard&photo3=pier&caption=VICE%20NIGHTS&subtitle=One%20city.%20No%20rules.&size=wide&grade=neon","w":1280},{"h":720,"name":"2-editor.jpg","query":"?shot=editor&photo=neon&photo2=boulevard&photo3=pier&caption=VICE%20NIGHTS&subtitle=One%20city.%20No%20rules.&size=wide&grade=sunset","w":1280},{"h":1280,"name":"3-cover.jpg","query":"?shot=cover&photo=boulevard&photo2=neon&photo3=pier&caption=BOULEVARD%20QUEEN&subtitle=Sunset%20on%20Ocean%20Drive&size=portrait&grade=sunset","w":1024},{"h":1080,"name":"4-cover.jpg","query":"?shot=cover&photo=pier&photo2=neon&photo3=boulevard&caption=PIER%20PRESSURE&subtitle=The%20catch%20of%20the%20day&size=square&grade=noir","w":1080}]
