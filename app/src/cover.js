@@ -14,6 +14,19 @@ export const SIZES = {
 
 export const GRADES = ['sunset', 'neon', 'noir'];
 
+// The cast poster's seven role labels, hero first. The editor shows one
+// editable input per label; the painter stamps each on its panel as a
+// dark chip with a pink slash.
+export const CAST_ROLES = [
+  'THE BOSS', 'THE SIREN', 'THE WHEELMAN', 'THE VAMP',
+  'THE DRIVER', 'THE FIXER', 'THE LOOKOUT',
+];
+
+export const CAST_CREDITS = [
+  'PALM PICTURES PRESENTS A VICE COVER STUDIO PRODUCTION',
+  'CASTING BY NEON ROW · MUSIC BY THE LOW TIDES · PRINTED IN VICE CITY',
+];
+
 // A panel is a polygon: an array of [x, y] corners in canvas pixels.
 // panelPolygons returns three of them — hero first, then the two small
 // ones — for a size and a layout. "flip" mirrors the hero to the other
@@ -22,6 +35,7 @@ export function panelPolygons(sizeKey, layout, w, h) {
   const m = Math.max(10, Math.round(Math.min(w, h) * 0.013));
   const s = Math.max(8, Math.round(Math.min(w, h) * 0.012));
   const L = m, R = w - m, T = m, B = h - m;
+  if (layout === 'cast') return castPanelPolygons(sizeKey, w, h, L, R, T, B, s);
   let polys;
   if (sizeKey === 'wide') {
     const topX = 0.585, botX = 0.545;
@@ -53,6 +67,49 @@ export function panelPolygons(sizeKey, layout, w, h) {
     );
   }
   return polys;
+}
+
+// The cast layout: seven panels, hero first. Wide posters put the hero
+// in the middle with a column of three panels on each side; portrait and
+// square posters give the hero the top band and stack two rows of three
+// underneath. Every panel is a rectangle (the hero's sides slant a
+// touch), separated by the same seam gap as the classic layouts.
+function castPanelPolygons(sizeKey, w, h, L, R, T, B, s) {
+  const rect = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  if (sizeKey === 'wide') {
+    const lx1 = L + (R - L) * 0.225;
+    const hx0 = lx1 + s, hx1 = L + (R - L) * 0.775;
+    const rx0 = hx1 + s;
+    const rowH = (B - T - s * 2) / 3;
+    const rows = [0, 1, 2].map((i) => [T + i * (rowH + s), T + i * (rowH + s) + rowH]);
+    const slant = w * 0.014;
+    const hero = [[hx0 + slant, T], [hx1, T], [hx1 - slant, B], [hx0, B]];
+    return [
+      hero,
+      rect(L, rows[0][0], lx1, rows[0][1]),
+      rect(L, rows[1][0], lx1, rows[1][1]),
+      rect(L, rows[2][0], lx1, rows[2][1]),
+      rect(rx0, rows[0][0], R, rows[0][1]),
+      rect(rx0, rows[1][0], R, rows[1][1]),
+      rect(rx0, rows[2][0], R, rows[2][1]),
+    ];
+  }
+  const heroB = T + (B - T) * (sizeKey === 'portrait' ? 0.5 : 0.46);
+  const colW = (R - L - s * 2) / 3;
+  const cols = [0, 1, 2].map((i) => [L + i * (colW + s), L + i * (colW + s) + colW]);
+  const rowH = (B - heroB - s * 2) / 2;
+  const rows = [0, 1].map((i) => [
+    heroB + s + i * (rowH + s), heroB + s + i * (rowH + s) + rowH,
+  ]);
+  return [
+    rect(L, T, R, heroB),
+    rect(cols[0][0], rows[0][0], cols[0][1], rows[0][1]),
+    rect(cols[1][0], rows[0][0], cols[1][1], rows[0][1]),
+    rect(cols[2][0], rows[0][0], cols[2][1], rows[0][1]),
+    rect(cols[0][0], rows[1][0], cols[0][1], rows[1][1]),
+    rect(cols[1][0], rows[1][0], cols[1][1], rows[1][1]),
+    rect(cols[2][0], rows[1][0], cols[2][1], rows[1][1]),
+  ];
 }
 
 function polyPath(ctx, poly) {
@@ -324,6 +381,284 @@ function drawPlaceTag(ctx, w, h, place) {
   try { ctx.letterSpacing = '0px'; } catch {}
 }
 
+// --- Cast poster furniture -------------------------------------------
+// Everything below is drawn over the seven panels to give the cast
+// layout the density of a cinema one-sheet: a review strip across the
+// top, a role chip on every panel, chrome lettering with a script
+// subtitle and a tagline ribbon, then a billing block, a barcode and a
+// gold award seal along the bottom. All invented names, all system
+// fonts, all plain canvas shapes.
+
+function drawRoleChip(ctx, poly, role, w, h) {
+  if (!role || !role.trim()) return;
+  const box = polyBox(poly);
+  const fs = Math.max(11, Math.round(h * 0.017));
+  ctx.save();
+  ctx.font = `800 ${fs}px "Arial Black", sans-serif`;
+  try { ctx.letterSpacing = `${Math.round(fs * 0.14)}px`; } catch {}
+  const tw = ctx.measureText(role.toUpperCase()).width;
+  const cw = tw + fs * 1.7, ch = fs * 1.85;
+  const inset = Math.max(6, Math.round(w * 0.006));
+  // Lower panels wear the chip at their top so the bottom furniture row
+  // stays clear; upper panels and the hero wear it at their foot.
+  const atTop = box.y > h * 0.5;
+  const x = box.x + inset;
+  const y = atTop ? box.y + inset : box.y + box.h - ch - inset;
+  ctx.fillStyle = 'rgba(10, 2, 20, 0.82)';
+  roundRect(ctx, x, y, cw, ch, ch * 0.22);
+  ctx.fill();
+  ctx.fillStyle = '#ff2975';
+  ctx.save();
+  ctx.translate(x + fs * 0.42, y + ch / 2);
+  ctx.transform(1, 0, -0.35, 1, 0, 0);
+  ctx.fillRect(-fs * 0.09, -ch * 0.3, fs * 0.18, ch * 0.6);
+  ctx.restore();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(role.toUpperCase(), x + fs * 0.85, y + ch / 2 + fs * 0.04);
+  ctx.restore();
+  try { ctx.letterSpacing = '0px'; } catch {}
+}
+
+function drawTopStrip(ctx, w, h, quote) {
+  const th = Math.round(h * 0.074);
+  ctx.save();
+  ctx.fillStyle = 'rgba(10, 2, 20, 0.78)';
+  ctx.fillRect(0, 0, w, th);
+  ctx.fillStyle = '#00e5ff';
+  ctx.fillRect(0, th - Math.max(2, h * 0.003), w, Math.max(2, h * 0.003));
+  // Five gold stars at the left.
+  const starFs = Math.round(th * 0.52);
+  ctx.font = `${starFs}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffd319';
+  ctx.shadowColor = 'rgba(255, 211, 25, 0.7)';
+  ctx.shadowBlur = starFs * 0.25;
+  ctx.fillText('★★★★★', Math.round(w * 0.018), th / 2 + 1);
+  ctx.shadowBlur = 0;
+  // The review quote, centred, in an italic serif.
+  if (quote && quote.trim()) {
+    let qfs = Math.round(th * 0.4);
+    ctx.textAlign = 'center';
+    while (qfs > 10) {
+      ctx.font = `italic 700 ${qfs}px Georgia, "Times New Roman", serif`;
+      if (ctx.measureText(quote).width <= w * 0.52) break;
+      qfs -= 1;
+    }
+    ctx.fillStyle = '#fdf6e3';
+    ctx.fillText(quote, w / 2, th / 2 + 1);
+  }
+  // VOL. 1 box at the right.
+  const bw = w * 0.085, bh = th * 0.66;
+  const bx = w - Math.round(w * 0.018) - bw, by = (th - bh) / 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1.5, h * 0.0022);
+  ctx.strokeRect(bx, by, bw, bh);
+  let volFs = Math.round(bh * 0.44);
+  while (volFs > 8) {
+    ctx.font = `900 ${volFs}px "Arial Black", sans-serif`;
+    if (ctx.measureText('VOL. 1').width <= bw * 0.88) break;
+    volFs -= 1;
+  }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('VOL. 1', bx + bw / 2, th / 2 + 1);
+  ctx.restore();
+}
+
+function drawBarcode(ctx, x, y, bw, bh) {
+  // A deterministic bar pattern (fixed seed, so every export matches):
+  // thin and thick black bars on a white card, digits underneath.
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(x, y, bw, bh);
+  let seed = 1986;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  ctx.fillStyle = '#111111';
+  let bx = x + bw * 0.06;
+  const barH = bh * 0.72;
+  while (bx < x + bw * 0.92) {
+    const barW = (rnd() < 0.3 ? 2.6 : 1.2) * (bw / 90);
+    if (rnd() < 0.78) ctx.fillRect(bx, y + bh * 0.07, barW, barH);
+    bx += barW + (bw / 90) * (0.7 + rnd() * 1.1);
+  }
+  let digitFs = Math.round(bh * 0.17);
+  while (digitFs > 6) {
+    ctx.font = `700 ${digitFs}px monospace`;
+    if (ctx.measureText('0 1986 060 2026').width <= bw * 0.92) break;
+    digitFs -= 1;
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('0 1986 060 2026', x + bw / 2, y + bh * 0.95);
+  ctx.restore();
+}
+
+function drawAwardSeal(ctx, cx, cy, r) {
+  ctx.save();
+  const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.15, cx, cy, r);
+  g.addColorStop(0, '#ffe98a');
+  g.addColorStop(0.6, '#f5b921');
+  g.addColorStop(1, '#c47f0a');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#8a5a00';
+  ctx.lineWidth = Math.max(1.5, r * 0.05);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#7a4d00';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.round(r * 0.78)}px sans-serif`;
+  ctx.fillText('★', cx, cy - r * 0.18);
+  ctx.font = `900 ${Math.round(r * 0.3)}px "Arial Black", sans-serif`;
+  ctx.fillText('TOP PICK', cx, cy + r * 0.48);
+  ctx.restore();
+}
+
+function drawCastPoster(ctx, w, h, state, polys) {
+  const roles = state.roles && state.roles.length ? state.roles : CAST_ROLES;
+  drawTopStrip(ctx, w, h, state.quote || '"A SUN-SOAKED KNOCKOUT." — THE PALM GAZETTE');
+  for (let i = 0; i < polys.length; i++) {
+    drawRoleChip(ctx, polys[i], roles[i] || '', w, h);
+  }
+
+  const family = '"Arial Black", Impact, "Helvetica Neue", sans-serif';
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  // Script subtitle: italic serif with a neon-pink glow, sitting just
+  // above the title like a hand-lettered flourish.
+  const script = (state.subtitle || '').trim();
+  let cursorY = h * 0.565;
+  if (script) {
+    let sfs = Math.round(h * 0.05);
+    while (sfs > 14) {
+      ctx.font = `italic 700 ${sfs}px Georgia, "Times New Roman", serif`;
+      if (ctx.measureText(script).width <= w * 0.8) break;
+      sfs -= 2;
+    }
+    ctx.shadowColor = 'rgba(255, 41, 117, 0.9)';
+    ctx.shadowBlur = sfs * 0.45;
+    ctx.fillStyle = '#ff7ac0';
+    ctx.fillText(script, w / 2, cursorY);
+    ctx.shadowBlur = 0;
+    cursorY += sfs * 0.32;
+  }
+
+  // Chrome-gradient main title, centred, reusing the classic poster's
+  // sunset-metal gradient and dark outline.
+  const title = (state.title || '').toUpperCase();
+  let size = Math.round(h * 0.105);
+  let lines = [];
+  // Fit by width first, then by height: the title block plus its
+  // tagline ribbon must clear the bottom furniture row — and, on
+  // portrait/square posters, the last panel row's role chips, which
+  // sit at that row's top edge.
+  const lastRowTops = polys.map((p) => polyBox(p).y).filter((y) => y > h * 0.6);
+  const ribbonLimit = w < h && lastRowTops.length
+    ? Math.min(...lastRowTops) - h * 0.008
+    : h * 0.855;
+  while (size > 20) {
+    ctx.font = `900 ${size}px ${family}`;
+    try { ctx.letterSpacing = `${Math.round(size * 0.02)}px`; } catch {}
+    lines = wrapTitle(ctx, title, size, w * 0.88);
+    const widest = Math.max(...lines.map((ln) => ctx.measureText(ln).width), 0);
+    const blockH = size * 0.92 + lines.length * size * 1.02;
+    if (widest <= w * 0.88 && cursorY + blockH + h * 0.055 <= ribbonLimit) break;
+    size -= 4;
+  }
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#160423';
+  ctx.lineWidth = Math.max(3, size * 0.07);
+  ctx.shadowColor = 'rgba(255, 41, 117, 0.55)';
+  ctx.shadowBlur = size * 0.14;
+  ctx.shadowOffsetY = size * 0.03;
+  let baseline = cursorY + size * 0.92;
+  for (const ln of lines) {
+    ctx.save();
+    ctx.translate(w / 2, baseline);
+    ctx.transform(1, 0, -0.05, 1, 0, 0);
+    // The gradient is built in the translated local space, so the
+    // sunset-metal ramp runs down each glyph: white, gold, orange, pink.
+    const grad = ctx.createLinearGradient(0, -size, 0, size * 0.12);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.35, '#ffe259');
+    grad.addColorStop(0.7, '#ff7b3d');
+    grad.addColorStop(1, '#ff2975');
+    ctx.fillStyle = grad;
+    ctx.strokeText(ln, 0, 0);
+    ctx.fillText(ln, 0, 0);
+    ctx.restore();
+    baseline += size * 1.02;
+  }
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  try { ctx.letterSpacing = '0px'; } catch {}
+
+  // Tagline ribbon under the title.
+  const tagline = (state.tagline || '').trim().toUpperCase();
+  let ribbonBottom = baseline;
+  if (tagline) {
+    const tfs = Math.max(13, Math.round(h * 0.023));
+    ctx.font = `800 ${tfs}px "Arial Black", sans-serif`;
+    try { ctx.letterSpacing = `${Math.round(tfs * 0.3)}px`; } catch {}
+    const tw = ctx.measureText(tagline).width;
+    const rw = tw + tfs * 2.6, rh = tfs * 2.0;
+    const rx = w / 2 - rw / 2, ry = baseline + tfs * 0.35;
+    ctx.fillStyle = 'rgba(10, 2, 20, 0.85)';
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.fillStyle = '#ff2975';
+    ctx.fillRect(rx, ry, rw, Math.max(2, tfs * 0.12));
+    ctx.fillRect(rx, ry + rh - Math.max(2, tfs * 0.12), rw, Math.max(2, tfs * 0.12));
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tagline, w / 2, ry + rh / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+    try { ctx.letterSpacing = '0px'; } catch {}
+    ribbonBottom = ry + rh;
+  }
+  ctx.restore();
+
+  // Gold award seal overlapping the right panels like a sticker.
+  drawAwardSeal(ctx, w * 0.885, h * 0.585, h * 0.05);
+
+  // Bottom furniture row: COMING SOON at the left, the tiny-caps
+  // billing block centred, a barcode at the right.
+  ctx.save();
+  const baseY = h * 0.972;
+  ctx.textBaseline = 'alphabetic';
+  const soonFs = Math.max(13, Math.round(h * 0.021));
+  ctx.font = `900 ${soonFs}px "Arial Black", sans-serif`;
+  try { ctx.letterSpacing = `${Math.round(soonFs * 0.18)}px`; } catch {}
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(255, 41, 117, 0.7)';
+  ctx.shadowBlur = soonFs * 0.3;
+  // On narrow posters the centred billing block would run into
+  // COMING SOON, so it gets its own line above the credits there.
+  const soonY = w < h ? baseY - Math.round(h * 0.0115) * 2.8 : baseY;
+  ctx.fillText('COMING SOON', Math.round(w * 0.022), soonY);
+  ctx.shadowBlur = 0;
+  try { ctx.letterSpacing = '0px'; } catch {}
+  const billFs = Math.max(9, Math.round(h * 0.0115));
+  ctx.font = `700 ${billFs}px "Arial Narrow", Arial, sans-serif`;
+  try { ctx.letterSpacing = `${Math.round(billFs * 0.12)}px`; } catch {}
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+  ctx.fillText(CAST_CREDITS[0], w / 2, baseY - billFs * 1.25);
+  ctx.fillText(CAST_CREDITS[1], w / 2, baseY);
+  try { ctx.letterSpacing = '0px'; } catch {}
+  ctx.restore();
+  drawBarcode(ctx, w * 0.9, h * 0.918, w * 0.078, h * 0.062);
+}
+
 // The whole poster. state:
 //   size, layout, grade, title, subtitle, place,
 //   photos: [image|null, image|null, image|null],
@@ -345,8 +680,8 @@ export function drawCover(canvas, state) {
   ctx.fillRect(0, 0, w, h);
 
   for (let i = 0; i < polys.length; i++) {
-    const crop = state.crops[i];
-    const img = state.photos[crop.photo] ?? null;
+    const crop = state.crops[i] || { photo: i, zoom: 1, ox: 0, oy: 0 };
+    const img = state.photos[crop.photo] ?? state.photos[i] ?? null;
     drawPhotoPanel(ctx, polys[i], img, crop, w, h);
   }
 
@@ -392,19 +727,23 @@ export function drawCover(canvas, state) {
   }
   ctx.restore();
 
+  const isCast = state.layout === 'cast';
   // Dressing, clipped to the hero panel: the striped sun tucked into the
   // top-right corner (sky in most photos) and halftone dots beside it.
-  const hero = polys[0];
-  const hb = polyBox(hero);
-  ctx.save();
-  polyPath(ctx, hero);
-  ctx.clip();
-  const sunR = Math.min(w, h) * 0.065;
-  const sunX = hb.x + hb.w * 0.88;
-  const sunY = hb.y + hb.h * 0.1;
-  drawRetroSun(ctx, sunX, sunY, sunR);
-  drawHalftone(ctx, hb.x + hb.w * 0.6, hb.y + hb.h * 0.03, hb.w * 0.24, hb.h * 0.18, Math.max(10, w * 0.011));
-  ctx.restore();
+  // The cast poster skips it — its top strip owns the hero's top edge.
+  if (!isCast) {
+    const hero = polys[0];
+    const hb = polyBox(hero);
+    ctx.save();
+    polyPath(ctx, hero);
+    ctx.clip();
+    const sunR = Math.min(w, h) * 0.065;
+    const sunX = hb.x + hb.w * 0.88;
+    const sunY = hb.y + hb.h * 0.1;
+    drawRetroSun(ctx, sunX, sunY, sunR);
+    drawHalftone(ctx, hb.x + hb.w * 0.6, hb.y + hb.h * 0.03, hb.w * 0.24, hb.h * 0.18, Math.max(10, w * 0.011));
+    ctx.restore();
+  }
 
   // Vignette over the whole poster.
   const vig = ctx.createRadialGradient(
@@ -416,12 +755,20 @@ export function drawCover(canvas, state) {
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
 
-  // Dark scrim under the title so the lettering always reads.
-  const scrim = ctx.createLinearGradient(0, h * 0.6, 0, h);
+  // Dark scrim under the title so the lettering always reads. The cast
+  // poster starts its scrim higher and runs it darker: its title block
+  // sits mid-poster and its bottom row carries the billing furniture.
+  const scrimTop = isCast ? h * 0.5 : h * 0.6;
+  const scrim = ctx.createLinearGradient(0, scrimTop, 0, h);
   scrim.addColorStop(0, 'rgba(12, 1, 24, 0)');
-  scrim.addColorStop(1, 'rgba(12, 1, 24, 0.85)');
+  scrim.addColorStop(1, isCast ? 'rgba(12, 1, 24, 0.92)' : 'rgba(12, 1, 24, 0.85)');
   ctx.fillStyle = scrim;
-  ctx.fillRect(0, h * 0.6, w, h * 0.4);
+  ctx.fillRect(0, scrimTop, w, h - scrimTop);
+
+  if (isCast) {
+    drawCastPoster(ctx, w, h, state, polys);
+    return;
+  }
 
   // Palm silhouettes in the dark bottom-right corner, behind the title.
   const palmColor = 'rgba(16, 5, 30, 0.88)';

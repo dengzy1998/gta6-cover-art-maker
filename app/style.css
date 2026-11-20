@@ -69,7 +69,16 @@ input[type=text] {
 input[type=text]:focus { outline: 2px solid var(--cyan); outline-offset: 1px; }
 input[type=range] { width: 100%; accent-color: var(--pink); }
 
-.panel-picks, .seg { display: flex; gap: 6px; }
+#slots { display: flex; flex-direction: column; gap: 10px; }
+.sample-select {
+  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--line); background: #12081f; color: var(--text); cursor: pointer;
+}
+.role-fields { display: flex; flex-direction: column; gap: 8px; }
+#roleInputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#roleInputs label { font-size: 12px; color: var(--muted); }
+
+.panel-picks, .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .panel-picks button, .seg button {
   flex: 1; padding: 8px 4px; border-radius: 7px; border: 1px solid var(--line);
   background: transparent; color: var(--muted); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;

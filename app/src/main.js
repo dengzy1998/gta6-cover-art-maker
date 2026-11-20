@@ -1,12 +1,17 @@
 // main.js — wires the Vice Cover Studio page: photo slots, panel crop,
-// caption fields, size and grade presets, and the PNG export. A `?shot=`
-// query sets up a fixed scene for a screenshot instead (./shots.js).
-import { drawCover, panelAt, panelPolygons, SIZES } from './cover.js';
+// caption fields, layout / size / grade presets, and the PNG export.
+// Two poster families share one editor: the classic three-panel cover
+// and the seven-panel Cast Poster, whose panels, role chips and poster
+// furniture all scale with the layout's panel count. A `?shot=` query
+// sets up a fixed scene for a screenshot instead (./shots.js).
+import { drawCover, panelAt, panelPolygons, SIZES, CAST_ROLES } from './cover.js';
 import { runShot } from './shots.js';
 
 const canvas = document.getElementById('cover');
 const titleInput = document.getElementById('titleInput');
 const subtitleInput = document.getElementById('subtitleInput');
+const taglineInput = document.getElementById('taglineInput');
+const quoteInput = document.getElementById('quoteInput');
 const placeInput = document.getElementById('placeInput');
 const statusLine = document.getElementById('status');
 const panelLabel = document.getElementById('panelLabel');
@@ -14,27 +19,51 @@ const zoomRange = document.getElementById('zoomRange');
 const panXRange = document.getElementById('panXRange');
 const panYRange = document.getElementById('panYRange');
 const exportBtn = document.getElementById('exportBtn');
+const slotsBox = document.getElementById('slots');
+const panelPicksBox = document.getElementById('panelPicks');
+const roleInputsBox = document.getElementById('roleInputs');
+const roleFields = document.getElementById('roleFields');
 
 const PANEL_NAMES = ['Hero panel', 'Panel two', 'Panel three'];
-const SAMPLE_NAMES = ['neon', 'boulevard', 'pier'];
+const SAMPLES = [
+  { name: 'boss', label: 'Boss' },
+  { name: 'siren', label: 'Siren' },
+  { name: 'wheelman', label: 'Wheelman' },
+  { name: 'vamp', label: 'Vamp' },
+  { name: 'neon', label: 'Neon' },
+  { name: 'boulevard', label: 'Boulevard' },
+  { name: 'pier', label: 'Pier' },
+];
+const MAX_PANELS = 7;
 
 // One crop per panel: which photo it shows, and how that photo is
 // zoomed and slid inside it. A photo may fill several panels at once.
+// Arrays are sized for the biggest layout (the 7-panel cast poster);
+// classic layouts simply use the first three.
 const state = {
   size: 'wide',
   layout: 'normal',
   grade: 'sunset',
   title: 'VICE NIGHTS',
   subtitle: 'One city. No rules.',
+  tagline: 'EVERY SAINT HAS A PRICE',
+  quote: '"A SUN-SOAKED KNOCKOUT." — THE PALM GAZETTE',
   place: 'VICE CITY',
-  photos: [null, null, null],
-  crops: [
-    { photo: 0, zoom: 1, ox: 0, oy: 0 },
-    { photo: 1, zoom: 1, ox: 0, oy: 0 },
-    { photo: 2, zoom: 1, ox: 0, oy: 0 },
-  ],
+  roles: [...CAST_ROLES],
+  photos: Array(MAX_PANELS).fill(null),
+  crops: Array.from({ length: MAX_PANELS }, (_, i) => ({ photo: i, zoom: 1, ox: 0, oy: 0 })),
 };
 let selectedPanel = 0;
+
+function panelCount() {
+  const size = SIZES[state.size];
+  return panelPolygons(state.size, state.layout, size.w, size.h).length;
+}
+
+function panelName(i) {
+  if (state.layout === 'cast') return `${state.roles[i] || `Panel ${i + 1}`} panel`;
+  return PANEL_NAMES[i] || `Panel ${i + 1}`;
+}
 
 function redraw() {
   const size = SIZES[state.size];
@@ -48,11 +77,11 @@ function redraw() {
 
 function syncPanelControls() {
   const crop = state.crops[selectedPanel];
-  panelLabel.textContent = `${PANEL_NAMES[selectedPanel]} — photo ${crop.photo + 1}`;
+  panelLabel.textContent = `${panelName(selectedPanel)} — photo ${crop.photo + 1}`;
   zoomRange.value = String(crop.zoom);
   panXRange.value = String(crop.ox);
   panYRange.value = String(crop.oy);
-  document.querySelectorAll('[data-panel-pick]').forEach((btn) => {
+  panelPicksBox.querySelectorAll('[data-panel-pick]').forEach((btn) => {
     btn.classList.toggle('active', Number(btn.dataset.panelPick) === selectedPanel);
   });
 }
@@ -68,7 +97,8 @@ function loadImage(url) {
 
 function setSlot(slot, img, label) {
   state.photos[slot] = img;
-  const card = document.querySelector(`.slot[data-slot="${slot}"]`);
+  const card = slotsBox.querySelector(`.slot[data-slot="${slot}"]`);
+  if (!card) return;
   const thumb = card.querySelector('.thumb');
   thumb.src = img ? img.src : '';
   thumb.classList.toggle('empty', !img);
@@ -86,38 +116,88 @@ async function loadSampleInto(slot, name) {
   }
 }
 
-// Photo slots: file pick, sample buttons, and "fill all panels".
-document.querySelectorAll('.slot').forEach((card) => {
-  const slot = Number(card.dataset.slot);
-  card.querySelector('input[type=file]').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const img = await loadImage(URL.createObjectURL(file));
-      setSlot(slot, img, file.name);
-      statusLine.textContent = `Loaded ${file.name} into slot ${slot + 1}.`;
-    } catch {
-      statusLine.textContent = 'That file did not open as an image.';
-    }
-    e.target.value = '';
-  });
-  card.querySelectorAll('[data-sample]').forEach((btn) => {
-    btn.addEventListener('click', () => loadSampleInto(slot, btn.dataset.sample));
-  });
-  card.querySelector('.fill-all').addEventListener('click', () => {
-    for (const crop of state.crops) crop.photo = slot;
-    statusLine.textContent = `All three panels now show slot ${slot + 1}.`;
-    redraw();
-  });
-});
+// Build the seven photo slots. Each takes a file from the machine or
+// any of the seven samples, and can fill every panel with its photo.
+function buildSlots() {
+  for (let slot = 0; slot < MAX_PANELS; slot++) {
+    const card = document.createElement('div');
+    card.className = 'slot';
+    card.dataset.slot = String(slot);
+    card.innerHTML = `
+      <img class="thumb empty" alt="Photo slot ${slot + 1}">
+      <div class="slot-body">
+        <span class="slot-name">${slot === 0 ? 'Slot 1 — hero' : `Slot ${slot + 1}`}</span>
+        <label class="file-btn">Choose a photo <input type="file" accept="image/*"></label>
+        <select class="sample-select" aria-label="Load a sample into slot ${slot + 1}">
+          <option value="">Load a sample…</option>
+          ${SAMPLES.map((s) => `<option value="${s.name}">${s.label}</option>`).join('')}
+        </select>
+        <button type="button" class="fill-all">Fill all panels with this photo</button>
+      </div>`;
+    slotsBox.appendChild(card);
+    card.querySelector('input[type=file]').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const img = await loadImage(URL.createObjectURL(file));
+        setSlot(slot, img, file.name);
+        statusLine.textContent = `Loaded ${file.name} into slot ${slot + 1}.`;
+      } catch {
+        statusLine.textContent = 'That file did not open as an image.';
+      }
+      e.target.value = '';
+    });
+    card.querySelector('.sample-select').addEventListener('change', (e) => {
+      if (e.target.value) loadSampleInto(slot, e.target.value);
+      e.target.value = '';
+    });
+    card.querySelector('.fill-all').addEventListener('click', () => {
+      for (const crop of state.crops) crop.photo = slot;
+      statusLine.textContent = `All panels now show slot ${slot + 1}.`;
+      redraw();
+    });
+  }
+}
 
-// Panel picking: the three buttons, or click a panel on the canvas.
-document.querySelectorAll('[data-panel-pick]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    selectedPanel = Number(btn.dataset.panelPick);
-    syncPanelControls();
+// Panel pick buttons follow the layout: three for the classic cover,
+// seven for the cast poster.
+function buildPanelPicks() {
+  panelPicksBox.innerHTML = '';
+  for (let i = 0; i < panelCount(); i++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.panelPick = String(i);
+    btn.textContent = i === 0 ? 'Hero' : `Panel ${i + 1}`;
+    if (state.layout === 'cast') btn.title = state.roles[i] || '';
+    btn.addEventListener('click', () => {
+      selectedPanel = i;
+      syncPanelControls();
+    });
+    panelPicksBox.appendChild(btn);
+  }
+  if (selectedPanel >= panelCount()) selectedPanel = 0;
+  syncPanelControls();
+}
+
+// One editable input per cast role label.
+function buildRoleInputs() {
+  roleInputsBox.innerHTML = '';
+  state.roles.forEach((role, i) => {
+    const label = document.createElement('label');
+    label.textContent = `Panel ${i + 1} role`;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 22;
+    input.value = role;
+    input.addEventListener('input', () => {
+      state.roles[i] = input.value;
+      buildPanelPicks();
+      redraw();
+    });
+    label.appendChild(input);
+    roleInputsBox.appendChild(label);
   });
-});
+}
 
 // Drag a panel's photo to slide it; the wheel zooms it.
 let drag = null;
@@ -179,21 +259,39 @@ panYRange.addEventListener('input', () => {
 });
 document.getElementById('resetCrop').addEventListener('click', () => {
   state.crops[selectedPanel] = { photo: state.crops[selectedPanel].photo, zoom: 1, ox: 0, oy: 0 };
-  statusLine.textContent = `${PANEL_NAMES[selectedPanel]} crop reset.`;
+  statusLine.textContent = `${panelName(selectedPanel)} crop reset.`;
   redraw();
 });
 
 // Caption fields.
 titleInput.addEventListener('input', () => { state.title = titleInput.value; redraw(); });
 subtitleInput.addEventListener('input', () => { state.subtitle = subtitleInput.value; redraw(); });
+taglineInput.addEventListener('input', () => { state.tagline = taglineInput.value; redraw(); });
+quoteInput.addEventListener('input', () => { state.quote = quoteInput.value; redraw(); });
 placeInput.addEventListener('input', () => { state.place = placeInput.value; redraw(); });
 
-// Size, grade and layout presets.
+// Layout, size and grade presets.
+function setLayout(layout) {
+  state.layout = layout;
+  document.querySelectorAll('[data-layout]').forEach((b) => b.classList.toggle('active', b.dataset.layout === layout));
+  roleFields.style.display = layout === 'cast' ? '' : 'none';
+  buildPanelPicks();
+  redraw();
+}
+document.querySelectorAll('[data-layout]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    setLayout(btn.dataset.layout);
+    statusLine.textContent = btn.dataset.layout === 'cast'
+      ? 'Cast poster: seven panels, role chips, billing block and all.'
+      : `Layout: ${btn.textContent.trim()}.`;
+  });
+});
 document.querySelectorAll('[data-size]').forEach((btn) => {
   btn.addEventListener('click', () => {
     state.size = btn.dataset.size;
     document.querySelectorAll('[data-size]').forEach((b) => b.classList.toggle('active', b === btn));
     statusLine.textContent = `Size: ${SIZES[state.size].label}.`;
+    buildPanelPicks();
     redraw();
   });
 });
@@ -204,11 +302,6 @@ document.querySelectorAll('[data-grade]').forEach((btn) => {
     statusLine.textContent = `Grade: ${btn.textContent.trim()}.`;
     redraw();
   });
-});
-document.getElementById('flipLayout').addEventListener('click', () => {
-  state.layout = state.layout === 'normal' ? 'flip' : 'normal';
-  statusLine.textContent = state.layout === 'flip' ? 'Hero flipped to the other side.' : 'Hero back on its usual side.';
-  redraw();
 });
 
 // Export: the preview canvas already paints at export resolution, so the
@@ -243,16 +336,24 @@ window.__exportPNG = () => new Promise((resolve) => {
 async function applyScene(scene) {
   state.size = SIZES[scene.size] ? scene.size : 'wide';
   state.grade = scene.grade || 'sunset';
-  state.layout = scene.layout || 'normal';
   state.title = scene.title;
   state.subtitle = scene.subtitle;
+  state.tagline = scene.tagline || state.tagline;
+  state.quote = scene.quote || state.quote;
   state.place = scene.place;
+  if (scene.roles && scene.roles.length) {
+    state.roles = Array.from({ length: MAX_PANELS }, (_, i) => scene.roles[i] ?? CAST_ROLES[i]);
+  }
   titleInput.value = scene.title;
   subtitleInput.value = scene.subtitle;
+  taglineInput.value = state.tagline;
+  quoteInput.value = state.quote;
   placeInput.value = scene.place;
   document.querySelectorAll('[data-size]').forEach((b) => b.classList.toggle('active', b.dataset.size === state.size));
   document.querySelectorAll('[data-grade]').forEach((b) => b.classList.toggle('active', b.dataset.grade === state.grade));
-  for (let i = 0; i < 3; i++) {
+  buildRoleInputs();
+  setLayout(scene.layout || 'normal');
+  for (let i = 0; i < MAX_PANELS; i++) {
     const name = scene.photos[i];
     if (!name) continue;
     try {
@@ -263,13 +364,18 @@ async function applyScene(scene) {
   redraw();
 }
 
+buildSlots();
+buildRoleInputs();
+setLayout('normal');
+
 const query = new URLSearchParams(location.search);
 const shot = query.get('shot');
 if (shot) {
   runShot(shot, query, applyScene);
 } else {
-  // First paint already shows a full poster from the three samples.
-  Promise.all(SAMPLE_NAMES.map((name, i) => loadSampleInto(i, name))).then(() => {
+  // First paint already shows a full poster from the samples.
+  Promise.all(SAMPLES.map((s, i) => loadSampleInto(i, s.name))).then(() => {
+    statusLine.textContent = 'Samples loaded. Pick the Cast Poster layout for the full seven-panel one-sheet.';
     redraw();
   });
   redraw();

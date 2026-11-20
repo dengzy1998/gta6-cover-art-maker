@@ -10,61 +10,19 @@
 <body>
 <header class="topbar">
   <div class="brand"><span class="brand-mark">VC</span> Vice Cover Studio</div>
-  <p class="tagline">Your photo. Your caption. A Vice City sunset poster.</p>
+  <p class="tagline">Your photos. Your cast. A Vice City movie poster.</p>
 </header>
 <main class="app">
   <aside class="controls" aria-label="Cover controls">
     <section class="group">
       <h2>1 · Photos</h2>
-      <p class="hint">Up to three photos from your machine. They never leave it. Drag a panel on the canvas to slide its photo; scroll to zoom.</p>
-      <div class="slot" data-slot="0">
-        <img class="thumb empty" alt="Photo slot 1">
-        <div class="slot-body">
-          <span class="slot-name">Slot 1 — hero</span>
-          <label class="file-btn">Choose a photo <input type="file" accept="image/*"></label>
-          <div class="samples">
-            <button type="button" data-sample="neon">Neon</button>
-            <button type="button" data-sample="boulevard">Boulevard</button>
-            <button type="button" data-sample="pier">Pier</button>
-          </div>
-          <button type="button" class="fill-all">Fill all panels with this photo</button>
-        </div>
-      </div>
-      <div class="slot" data-slot="1">
-        <img class="thumb empty" alt="Photo slot 2">
-        <div class="slot-body">
-          <span class="slot-name">Slot 2</span>
-          <label class="file-btn">Choose a photo <input type="file" accept="image/*"></label>
-          <div class="samples">
-            <button type="button" data-sample="neon">Neon</button>
-            <button type="button" data-sample="boulevard">Boulevard</button>
-            <button type="button" data-sample="pier">Pier</button>
-          </div>
-          <button type="button" class="fill-all">Fill all panels with this photo</button>
-        </div>
-      </div>
-      <div class="slot" data-slot="2">
-        <img class="thumb empty" alt="Photo slot 3">
-        <div class="slot-body">
-          <span class="slot-name">Slot 3</span>
-          <label class="file-btn">Choose a photo <input type="file" accept="image/*"></label>
-          <div class="samples">
-            <button type="button" data-sample="neon">Neon</button>
-            <button type="button" data-sample="boulevard">Boulevard</button>
-            <button type="button" data-sample="pier">Pier</button>
-          </div>
-          <button type="button" class="fill-all">Fill all panels with this photo</button>
-        </div>
-      </div>
+      <p class="hint">Up to seven photos from your machine — they never leave it. The Cast Poster layout uses all seven; the classic layouts use the first three. Drag a panel on the canvas to slide its photo; scroll to zoom.</p>
+      <div id="slots"></div>
     </section>
 
     <section class="group">
       <h2>2 · Crop the selected panel</h2>
-      <div class="panel-picks">
-        <button type="button" data-panel-pick="0" class="active">Hero</button>
-        <button type="button" data-panel-pick="1">Panel 2</button>
-        <button type="button" data-panel-pick="2">Panel 3</button>
-      </div>
+      <div class="panel-picks" id="panelPicks"></div>
       <p class="hint" id="panelLabel">Hero panel — photo 1</p>
       <label>Zoom <input id="zoomRange" type="range" min="1" max="3" step="0.01" value="1"></label>
       <label>Slide left / right <input id="panXRange" type="range" min="-0.6" max="0.6" step="0.01" value="0"></label>
@@ -75,12 +33,23 @@
     <section class="group">
       <h2>3 · Words</h2>
       <label>Title <input id="titleInput" type="text" maxlength="30" value="VICE NIGHTS"></label>
-      <label>Subtitle <input id="subtitleInput" type="text" maxlength="48" value="One city. No rules."></label>
-      <label>Place tag <input id="placeInput" type="text" maxlength="20" value="VICE CITY"></label>
+      <label>Subtitle / script line <input id="subtitleInput" type="text" maxlength="48" value="One city. No rules."></label>
+      <label>Tagline (cast poster ribbon) <input id="taglineInput" type="text" maxlength="42" value="EVERY SAINT HAS A PRICE"></label>
+      <label>Review quote (cast poster strip) <input id="quoteInput" type="text" maxlength="64" value="&quot;A SUN-SOAKED KNOCKOUT.&quot; — THE PALM GAZETTE"></label>
+      <label>Place tag (classic layouts) <input id="placeInput" type="text" maxlength="20" value="VICE CITY"></label>
+      <div id="roleFields" class="role-fields">
+        <p class="hint">Cast role labels — one chip per panel, hero first.</p>
+        <div id="roleInputs"></div>
+      </div>
     </section>
 
     <section class="group">
       <h2>4 · Look</h2>
+      <div class="seg" role="group" aria-label="Poster layout">
+        <button type="button" data-layout="normal" class="active">Classic 3-panel</button>
+        <button type="button" data-layout="cast">Cast poster · 7</button>
+        <button type="button" data-layout="flip">Flipped hero</button>
+      </div>
       <div class="seg" role="group" aria-label="Export size">
         <button type="button" data-size="square">1080 × 1080</button>
         <button type="button" data-size="portrait">1080 × 1350</button>
@@ -91,7 +60,6 @@
         <button type="button" data-grade="neon">Neon</button>
         <button type="button" data-grade="noir">Noir</button>
       </div>
-      <button type="button" id="flipLayout" class="ghost">Flip hero to the other side</button>
     </section>
 
     <button id="exportBtn" type="button">Export PNG</button>
